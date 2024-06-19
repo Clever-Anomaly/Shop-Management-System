@@ -1,0 +1,65 @@
+User guide for the store:
+
+1. Login: 
+   - Enter your first name, last name, and mobile number as the password to login.
+   - If the login is successful, you will be directed to the main menu.
+
+2. Sign Up:
+   - Enter your personal details such as first name, last name, mobile number, age, date of birth, state, city, pincode, and house number.
+   - Click on the "Sign Up" button to create a new account.
+
+3. Admin Login:
+   - Enter your username and password to login as an administrator.
+   - If the login is successful, you will be directed to the admin menu.
+
+4. Exit:
+   - Click on the "Exit" option to exit the store.
+
+Main Menu (Customer):
+   - View Cart: Displays the products in your cart along with their details and quantities. You can remove items from the cart or place an order.
+   - Browse all Products: Displays all the available products in the store.
+   - Browse Products by Category: Allows you to select a category and view the products in that category.
+   - View Orders: Displays your previous orders along with their details.
+   - Logout: Logs out from your account and returns to the login screen.
+
+Cart Menu:
+   - Remove from Cart: Allows you to remove a product from your cart.
+   - Place Order: Allows you to place an order for the products in your cart.
+   - Go Back: Returns to the main menu.
+
+Browse Products Menu:
+   - Add to Cart: Allows you to add a product to your cart.
+   - Go Back: Returns to the main menu.
+
+Browse Products by Category Menu:
+   - Select Category: Allows you to select a category and view the products in that category.
+   - Go Back: Returns to the main menu.
+
+View Orders Menu:
+   - View Order Details: Allows you to view the details of a specific order.
+   - Go Back: Returns to the main menu.
+
+Admin Menu:
+   - View all Products: Displays all the products in the store.
+   - View all Customers: Displays all the registered customers.
+   - View all Delivery Partners: Displays all the delivery partners.
+   - Logout: Logs out from the admin account and returns to the login screen.
+
+Admin Product Menu:
+   - Add Product: Allows you to add a new product to the store.
+   - Update Product: Allows you to update the details of an existing product.
+   - Delete Product: Allows you to delete a product from the store.
+   - Go Back: Returns to the admin menu.
+
+Admin Customer Menu:
+   - Update Customer: Allows you to update the details of a customer.
+   - Delete Customer: Allows you to delete a customer from the store.
+   - Go Back: Returns to the admin menu.
+
+Admin Delivery Partner Menu:
+   - Add Delivery Partner: Allows you to add a new delivery partner to the store.
+   - Update Delivery Partner: Allows you to update the details of an existing delivery partner.
+   - Delete Delivery Partner: Allows you to delete a delivery partner from the store.
+   - Go Back: Returns to the admin menu.
+
+For detailed instructions, please refer to the prompts and options provided by the program itself.

@@ -1,0 +1,401 @@
+DBMS Submission 6 and Transactions
+
+Team Members:
+Saurav Haldar (2022464) 
+Shiv Kant (2022481) 
+
+CREATE DATABASE Store;
+
+USE Store;
+
+CREATE TABLE Administrator(
+	username VARCHAR(30) NOT NULL PRIMARY KEY,
+    pass VARCHAR(12) NOT NULL
+);
+
+CREATE TABLE Partner_Store (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Name VARCHAR(50) NOT NULL,
+    Area_Pincode INT NOT NULL,
+    Contact_no BIGINT NOT NULL,
+    State VARCHAR(30) NOT NULL,
+    City VARCHAR(30) NOT NULL,
+    Store_no VARCHAR(10) NOT NULL
+);
+
+CREATE TABLE Customer (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    First_name VARCHAR(30) NOT NULL,
+    Last_name VARCHAR(30) NOT NULL,
+    Mobile_no BIGINT NOT NULL,
+    Age INT,
+    DOB DATE,
+    State VARCHAR(30) NOT NULL,
+    City VARCHAR(30) NOT NULL,
+    Pincode INT NOT NULL,
+    House_no VARCHAR(20) NOT NULL,
+    Store_Id INT NOT NULL,
+    FOREIGN KEY (Store_Id)
+		REFERENCES Partner_Store(Id)
+);
+
+
+CREATE TABLE Category (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Name VARCHAR(50) NOT NULL
+);
+
+
+CREATE TABLE Product (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Category_Id INT NOT NULL,
+    Name VARCHAR(30) NOT NULL,
+    Brand VARCHAR(20) NOT NULL,
+    Cost FLOAT NOT NULL,
+    Stock INT NOT NULL DEFAULT 0,
+    FOREIGN KEY (Category_id)
+        REFERENCES Category (Id)
+);
+
+
+
+CREATE TABLE Delivery_Partner (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Store_Id INT NOT NULL,
+    First_name VARCHAR(30) NOT NULL,
+    Last_name VARCHAR(30) NOT NULL,
+    Mobile_no BIGINT NOT NULL,
+    FOREIGN KEY (Store_Id)
+        REFERENCES Partner_Store (Id)
+);
+
+
+CREATE TABLE Cart (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Customer_Id INT NOT NULL UNIQUE,
+    Total_Items INT NOT NULL DEFAULT 0,
+    Total_Cost FLOAT NOT NULL DEFAULT 0,
+    FOREIGN KEY (Customer_Id)
+        REFERENCES Customer (Id)
+);
+
+
+CREATE TABLE Orders (
+    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Customer_Id INT NOT NULL,
+    Cart_Id INT NOT NULL,
+    Delivery_Partner_Id INT NOT NULL,
+    Order_Date DATETIME,
+    Total_Cost FLOAT NOT NULL,
+    Payment_Method VARCHAR(40) NOT NULL,
+    OrderStatus VARCHAR(20) NOT NULL DEFAULT 'not delivered',
+    FOREIGN KEY (Customer_Id)
+        REFERENCES Customer (Id),
+    FOREIGN KEY (Cart_Id)
+        REFERENCES Cart (Id),
+    FOREIGN KEY (Delivery_Partner_Id)
+        REFERENCES Delivery_Partner (id)
+);
+
+
+CREATE TABLE Order_Items (
+    Order_Id INT NOT NULL,
+    Product_Id INT NOT NULL,
+    No_of_Items INT NOT NULL DEFAULT 1,
+    Cost FLOAT NOT NULL,
+    PRIMARY KEY (Order_Id , Product_Id),
+    FOREIGN KEY (Order_Id)
+        REFERENCES Orders (Id),
+    FOREIGN KEY (Product_Id)
+        REFERENCES Product (Id)
+);
+
+
+CREATE TABLE Cart_Items (
+    Cart_Id INT NOT NULL,
+    Product_Id INT NOT NULL,
+    No_of_Items INT NOT NULL DEFAULT 1,
+    Cost FLOAT NOT NULL,
+    PRIMARY KEY (Cart_Id , Product_Id),
+    FOREIGN KEY (Cart_Id)
+        REFERENCES Cart (Id),
+    FOREIGN KEY (Product_Id)
+        REFERENCES Product (Id)
+);
+
+
+
+CREATE TABLE Works_for (
+    Delivery_Partner_Id INT NOT NULL,
+    Store_Id INT NOT NULL,
+    Shift VARCHAR(10) NOT NULL DEFAULT 'day',
+    PRIMARY KEY (Delivery_Partner_Id , Store_Id),
+    FOREIGN KEY (Delivery_Partner_Id)
+        REFERENCES Delivery_Partner (Id),
+    FOREIGN KEY (Store_Id)
+        REFERENCES Partner_Store (Id)
+);
+
+
+DELIMITER //
+CREATE TRIGGER Add_Store_Id_to_Customer
+BEFORE INSERT ON Customer
+FOR EACH ROW
+BEGIN
+    -- Declare variable to store the nearest partner store id
+    DECLARE nearest_store_id INT;
+
+    -- Determine the nearest partner store to the customer based on pincode similarity
+    SELECT Id INTO nearest_store_id
+    FROM Partner_Store
+    ORDER BY ABS(Area_Pincode - NEW.Pincode)
+    LIMIT 1;
+
+    -- Set the Store_Id for the newly inserted customer
+    SET NEW.Store_Id = nearest_store_id;
+END;
+//
+DELIMITER ;
+
+
+DELIMITER //
+CREATE TRIGGER Add_New_Cart_After_Customer_Insert
+AFTER INSERT ON Customer
+FOR EACH ROW
+BEGIN
+    INSERT INTO Cart (Customer_Id, Total_Items)
+    VALUES (NEW.Id, 0);
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER Calculate_Cart_Item_Cost
+BEFORE INSERT ON Cart_Items
+FOR EACH ROW
+BEGIN
+    DECLARE item_cost FLOAT;
+    
+    -- Retrieve the cost of the product
+    SELECT Cost INTO item_cost
+    FROM Product
+    WHERE Id = NEW.Product_Id;
+    
+    -- Calculate the cost based on the number of items
+    SET NEW.Cost = item_cost * NEW.No_of_Items;
+END;
+//
+DELIMITER ;
+
+
+DELIMITER //
+CREATE TRIGGER Update_Cart_Total_After_Item_Insert
+AFTER INSERT ON Cart_Items
+FOR EACH ROW
+BEGIN
+    DECLARE total_items INT;
+    DECLARE total_cost FLOAT;
+    
+    -- Calculate the total number of items in the cart
+    SELECT SUM(No_of_Items) INTO total_items
+    FROM Cart_Items
+    WHERE Cart_Id = NEW.Cart_Id;
+    
+    -- Calculate the total cost of items in the cart
+    SELECT SUM(Cost) INTO total_cost
+    FROM Cart_Items
+    WHERE Cart_Id = NEW.Cart_Id;
+    
+    -- Update the total items and total cost in the Cart table
+    UPDATE Cart
+    SET Total_Items = total_items,
+        Total_Cost = total_cost
+    WHERE Id = NEW.Cart_Id;
+END;
+//
+DELIMITER ;
+
+
+DELIMITER //
+CREATE TRIGGER Add_Order_Date_Customer_Id
+BEFORE INSERT ON Orders
+FOR EACH ROW
+BEGIN
+
+    -- Copy total items and total cost from cart to order
+    SET NEW.Total_Cost = (SELECT Total_Cost FROM Cart WHERE Id = NEW.Cart_Id),
+		NEW.Customer_Id = (SELECT Customer_Id FROM Cart WHERE ID = NEW.Cart_Id),
+		NEW.Order_Date = NOW();
+
+END;
+//
+DELIMITER ;
+
+
+DELIMITER //
+CREATE TRIGGER Copy_Cart_Items_to_Order_Items
+AFTER INSERT ON Orders
+FOR EACH ROW
+BEGIN
+    -- Copy cart items to order items
+    INSERT INTO Order_Items (Order_Id, Product_Id, No_of_Items, Cost)
+    SELECT NEW.Id, ci.Product_Id, ci.No_of_Items, ci.Cost
+    FROM Cart_Items ci
+    WHERE ci.Cart_Id = NEW.Cart_Id;
+    
+    -- Delete cart items
+    DELETE FROM Cart_Items WHERE Cart_Id = NEW.Cart_Id;
+
+    -- Reset total items in the cart to 0
+    UPDATE Cart
+    SET Total_Items = 0,Total_Cost = 0
+    WHERE Id = NEW.Cart_Id;
+END;
+//
+DELIMITER ;
+
+
+INSERT INTO Administrator(username,pass) VALUE
+('admin','admin1234567');
+
+
+
+
+INSERT INTO Partner_Store (Name, Area_Pincode, Contact_no, State, City, Store_no) VALUES
+('XYZ Electronics', 400001, 9876543210, 'Maharashtra', 'Mumbai', 'Store001'),
+('ABC Clothing', 380001, 8765432109, 'Gujarat', 'Ahmedabad', 'Store002'),
+('PQR Books', 226001, 7654321098, 'Uttar Pradesh', 'Lucknow', 'Store003'),
+('LMN Furniture', 110001, 6543210987, 'Delhi', 'New Delhi', 'Store004'),
+('JKL Sports', 600001, 5432109876, 'Tamil Nadu', 'Chennai', 'Store005'),
+('RST Appliances', 560001, 4321098765, 'Karnataka', 'Bangalore', 'Store006'),
+('GHI Beauty', 500001, 3210987654, 'Telangana', 'Hyderabad', 'Store007'),
+('MNO Toys', 411001, 2109876543, 'Maharashtra', 'Pune', 'Store008'),
+('UVW Stationery', 682001, 1098765432, 'Kerala', 'Kochi', 'Store009'),
+('EFG Automotive', 700001, 9876543210, 'West Bengal', 'Kolkata', 'Store010');
+
+
+
+INSERT INTO Customer (First_name, Last_name, Mobile_no, Age, DOB, State, City, Pincode, House_no) 
+VALUES
+('Rajesh', 'Kumar', 987654321, 30, '1994-05-21', 'Maharashtra', 'Mumbai', 400001, 'Street'),
+('Priya', 'Patel', 876543210, 25, '1999-10-15', 'Gujarat', 'Ahmedabad', 380001, 'Avenue'),
+('Amit', 'Sharma', 765432109, 35, '1989-03-08', 'Uttar Pradesh', 'Lucknow', 226001, ' Road'),
+('Anjali', 'Verma', 654321098, 28, '1996-07-12', 'Delhi', 'New Delhi', 110001, 'levard'),
+('Rahul', 'Singh', 543210987, 40, '1982-12-30', 'Tamil Nadu', 'Chennai', 600001, '1ne'),
+('Sneha', 'Gupta', 432109876, 22, '2002-02-25', 'Karnataka', 'Bangalore', 560001, 'rive'),
+('Vikram', 'Yadav', 321098765, 33, '1989-09-18', 'Telangana', 'Hyderabad', 500001, '1ourt'),
+('Pooja', 'Chavan', 210987654, 29, '1995-04-04', 'Maharashtra', 'Pune', 411001, '1ce'),
+('Deepak', 'Rao', 109876543, 38, '1984-11-27', 'Kerala', 'Kochi', 682001, '1uare'),
+('Neha', 'Shah', 987654321, 32, '1990-08-03', 'West Bengal', 'Kolkata', 700001, 'lley'),
+('Ram', 'Kumar', 928736757, 24, '2000-11-27', 'Delhi', 'Delhi', 110001, 'C-201');
+
+
+INSERT INTO Category (name) VALUES
+('Electronics'),
+('Clothing'),
+('Books'),
+('Furniture'),
+('Sports Equipment'),
+('Home Appliances'),
+('Beauty & Personal Care'),
+('Toys & Games'),
+('Stationery'),
+('Automotive');
+
+
+INSERT INTO Product (Category_id, Name, Brand, Cost, Stock) VALUES
+(1, 'Smartphone', 'Samsung', 599.99, 100),
+(2, 'T-Shirt', 'Nike', 29.99, 500),
+(3, 'The Great Gatsby', 'Penguin Books', 12.99, 50),
+(4, 'Sofa', 'IKEA', 499.99, 10),
+(5, 'Soccer Ball', 'Adidas', 19.99, 200),
+(6, 'Refrigerator', 'LG', 899.99, 20),
+(7, 'Shampoo', 'Head & Shoulders', 9.99, 1000),
+(8, 'Lego Set', 'LEGO', 49.99, 100),
+(9, 'Ballpoint Pen', 'Pilot', 1.99, 1000),
+(10, 'Car Battery', 'Exide', 99.99, 50);
+
+
+
+INSERT INTO Delivery_Partner (Store_Id, First_name, Last_name, Mobile_no) VALUES
+(1,'Amit', 'Sharma', 9876543210),
+(2,'Rahul', 'Verma', 8765432109),
+(3,'Priya', 'Singh', 7654321098),
+(4,'Neha', 'Patel', 6543210987),
+(5,'Raj', 'Gupta', 5432109876),
+(6,'Sneha', 'Chauhan', 4321098765),
+(7,'Vikram', 'Kumar', 3210987654),
+(8,'Deepak', 'Yadav', 2109876543),
+(9,'Anjali', 'Joshi', 1098765432),
+(10, 'Mohit', 'Malik', 9876543210);
+
+INSERT INTO Works_for (Delivery_Partner_Id, Store_Id, Shift) VALUES
+(1, 1, 'day'),
+(2, 2, 'night'),
+(3, 3,'day'),
+(4, 4, 'day'),
+(5, 5, 'night'),
+(6, 6, 'day'),
+(7, 7, 'day'),
+(8, 8, 'night'),
+(9, 9, 'day'),
+(10, 10, 'day');
+
+
+
+
+INSERT INTO Cart_Items (Cart_Id, Product_Id, No_of_Items) VALUES
+(1, 1, 2),
+(1, 2, 1),
+(2, 3, 3),
+(2, 4, 1),
+(3, 5, 2),
+(3, 6, 1),
+(4, 7, 1),
+(4, 8, 1),
+(5, 9, 5),
+(5, 10, 2);
+
+
+
+Transaction examples:
+
+Non - Conflicting Transactions :
+
+Transaction 1: Updating the price of a product and a customer placing an order for a different product.
+
+In this transaction, one user updates the price of a product.
+Another user places an order for a different product.
+These two transactions do not conflict because they are working on different products.
+
+Transaction 2: Adding a new customer and updating the customer's details.
+
+In this transaction, one user adds a new customer to the database.
+Another user updates the details of an existing customer.
+These two transactions do not conflict because they are working on different customers.
+
+Transaction 3: Adding a new product and updating the stock of another product.
+
+In this transaction, one user adds a new product to the database.
+Another user updates the stock of a different product.
+These two transactions do not conflict because they are working on different products.
+
+Transaction 4: Deleting a customer and deleting an order associated with that customer.
+
+In this transaction, one user deletes a customer from the database.
+Another user deletes an order associated with that customer.
+These two transactions do not conflict because they are performing different operations on related data but not at the same time.
+
+Conflicting Transactions :
+
+Transaction 1: Two users trying to book the last stock of a product.
+
+In this transaction, two users simultaneously try to book the last stock of a product.
+Since both transactions are trying to modify the same data (product availability), they can conflict with each other.
+This can lead to inconsistencies , such as both users being able to place the order.
+
+Transaction 2: Updating the price of a product and a customer placing an order for the same product.
+
+In this transaction, one user tries to update the price of a product while another user is placing an order for the same product.
+Since both transactions are modifying/reading the same data (product price), they can conflict with each other.
+This can lead to inconsistencies , such as the customer being charged the old price when the new price should have been applied.
