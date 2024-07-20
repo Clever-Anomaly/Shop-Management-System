@@ -1,2 +1,2 @@
-#Shop-Management System
-Guide: Prof. Vikram Goyal
+# Shop-Management System
+* *Guide: Prof. Vikram Goyal*
